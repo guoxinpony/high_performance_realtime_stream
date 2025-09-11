@@ -1,4 +1,11 @@
-
+x-spark-common: &spark-common
+  image: bitnami/spark:3.5.1
+  volumes:
+    - ./jobs:/opt/bitnami/spark/jobs
+    - ./mnt/checkpoints:/mnt/spark-checkpoints
+    - ./mnt/spark-state:/mnt/spark-state
+  networks:
+    - high-performance-streaming
 
 services:
   kafka-controller-1:
@@ -63,7 +70,7 @@ services:
       KAFKA_NODE_ID: 4
       KAFKA_PROCESS_ROLES: broker
       KAFKA_LISTENERS: 'PLAINTEXT://:19092,PLAINTEXT_HOST://:9092'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-broker-1:19092,PLAINTEXT_HOST://localhost:29092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-broker-1:19092,PLAINTEXT_HOST://127.0.0.1:29092'
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
@@ -88,7 +95,7 @@ services:
       KAFKA_NODE_ID: 5
       KAFKA_PROCESS_ROLES: broker
       KAFKA_LISTENERS: 'PLAINTEXT://:19092,PLAINTEXT_HOST://:9092'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-broker-2:19092,PLAINTEXT_HOST://localhost:39092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-broker-2:19092,PLAINTEXT_HOST://127.0.0.1:39092'
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
@@ -113,7 +120,7 @@ services:
       KAFKA_NODE_ID: 6
       KAFKA_PROCESS_ROLES: broker
       KAFKA_LISTENERS: 'PLAINTEXT://:19092,PLAINTEXT_HOST://:9092'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-broker-3:19092,PLAINTEXT_HOST://localhost:49092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-broker-3:19092,PLAINTEXT_HOST://127.0.0.1:49092'
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
@@ -138,7 +145,7 @@ services:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry-high-performance
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka-broker-1:19092,kafka-broker-2:19092,kafka-broker-3:19092
       SCHEMA_REGISTRY_KAFKASTORE_TOPIC: _schemas
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:18081
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
     depends_on:
       - kafka-broker-1
       - kafka-broker-2
@@ -162,7 +169,7 @@ services:
           brokers: ["kafka-broker-1:19092", "kafka-broker-2:19092", "kafka-broker-3:19092"] 
           schemaRegistry:
             enabled: true
-            urls: ["http://schema-registry:18081"]
+            urls: ["http://schema-registry:8081"]
 
         redpanda:
           adminApi:
@@ -177,6 +184,31 @@ services:
       - high-performance-streaming
 
 
+  spark-master:
+    <<: *spark-common
+    command: bin/spark-class org.apache.spark.deploy.master.Master
+    ports:
+      - "9190:8080"
+      - "7077:7077"
+      - "4040:4040"
+      - "8081:8081"
+  
+  spark-worker-1: &spark-worker-image
+    <<: *spark-common
+    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    depends_on:
+      - spark-master
+    environment:
+      SPARK_MODE: worker
+      SPARK_WORKER_CORES: 1
+      SPARK_WORKER_MEMORY: 1g
+      SPARK_MASTER_URL: spark://spark-master:7077
+
+  spark-worker-2:
+    <<: *spark-worker-image
+
+  spark-worker-3:
+    <<: *spark-worker-image
 
 volumes:
   controller_data_1:
