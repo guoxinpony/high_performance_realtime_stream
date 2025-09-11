@@ -1,0 +1,11 @@
+# Maven
+/target/
+
+# Gradle
+/.gradle/
+/build/
+
+# VS Code
+.vscode/
+
+*.log
