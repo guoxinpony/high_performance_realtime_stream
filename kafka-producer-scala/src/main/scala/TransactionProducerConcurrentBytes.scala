@@ -8,8 +8,15 @@ import java.time.Duration
 import java.util.concurrent.atomic.AtomicLong
 import java.nio.charset.StandardCharsets
 import scala.util.Random
+import java.util.UUID
+import java.math.{ BigDecimal => JBigDecimal, RoundingMode }
 
 object TransactionProducerConcurrentBytes {
+  private val merchants      = Array("merchant_1", "merchant_2", "merchant_3")
+  private val txTypes        = Array("purchase", "refund")
+  private val paymentMethods = Array("credit_card", "paypal", "bank_transfer")
+  private val currencies     = Array("USD", "EUR", "GBP")
+  private val boolStr        = Array("True", "False")
 
   // 与步骤6相同的配置 case class
   final case class ProducerCfg(
@@ -25,6 +32,7 @@ object TransactionProducerConcurrentBytes {
     deliveryTimeoutMs: Int,
     enableIdempotence: Boolean
   )
+
   final case class LoadCfg(
     threads: Int,
     recordsPerThread: Long,
@@ -53,6 +61,8 @@ object TransactionProducerConcurrentBytes {
       deliveryTimeoutMs = p.getInt("delivery.timeout.ms"),
       enableIdempotence = p.getBoolean("enable.idempotence")
     )
+
+    
     val lc = LoadCfg(
       threads          = l.getInt("threads"),
       recordsPerThread = l.getLong("records.per.thread"),
@@ -83,18 +93,36 @@ object TransactionProducerConcurrentBytes {
     p
   }
 
-  // 复用的 StringBuilder，减少对象创建
+
   private def jsonBytes(rnd: Random, id: Long, sb: StringBuilder): Array[Byte] = {
     sb.setLength(0)
-    val amount = (rnd.nextDouble() * 1000)
-    // 构造极简 JSON；如果你需要严格格式，可保留两位小数
+
+    val transactionId   = UUID.randomUUID().toString
+    val userId          = s"user_${1 + rnd.nextInt(100)}"                  // 1..100
+    val merchantId      = merchants(rnd.nextInt(merchants.length))
+    // amount: uniform(50000, 150000)，保留两位小数，作为“数值”输出（不加引号）
+    val amountNum       = new JBigDecimal(50000.0 + rnd.nextDouble() * 100000.0)
+                            .setScale(2, RoundingMode.HALF_UP).toPlainString
+    val transactionTime = System.currentTimeMillis() / 1000L               // 秒，和 int(time.time()) 一致
+    val transactionType = txTypes(rnd.nextInt(txTypes.length))
+    val location        = s"location_${1 + rnd.nextInt(50)}"               // 1..50
+    val paymentMethod   = paymentMethods(rnd.nextInt(paymentMethods.length))
+    val isInternational = boolStr(rnd.nextInt(2))                          // "True"/"False"（字符串）
+    val currency        = currencies(rnd.nextInt(currencies.length))
+
     sb.append('{')
-      .append("\"id\":").append(id).append(',')
-      .append("\"user_id\":").append(rnd.nextInt(100000)).append(',')
-      .append("\"merchant\":\"m-").append(rnd.nextInt(5000)).append("\",")
-      .append("\"amount\":").append("%.2f".formatLocal(java.util.Locale.ROOT, amount)).append(',')
-      .append("\"ts\":").append(System.currentTimeMillis())
+      .append("\"transactionId\":\"").append(transactionId).append("\",")
+      .append("\"userId\":\"").append(userId).append("\",")
+      .append("\"amount\":").append(amountNum).append(',')                 
+      .append("\"transactionTime\":").append(transactionTime).append(',')
+      .append("\"merchantId\":\"").append(merchantId).append("\",")
+      .append("\"transactionType\":\"").append(transactionType).append("\",")
+      .append("\"location\":\"").append(location).append("\",")
+      .append("\"paymentMethod\":\"").append(paymentMethod).append("\",")
+      .append("\"isInternational\":\"").append(isInternational).append("\",") 
+      .append("\"currency\":\"").append(currency).append("\"")
       .append('}')
+
     sb.toString.getBytes(StandardCharsets.UTF_8)
   }
 
