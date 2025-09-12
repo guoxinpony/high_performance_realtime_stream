@@ -163,7 +163,6 @@ def producer_data_in_parallel(num_threads):
 
 
 if __name__ == "__main__":
-    # print(">>> RUNNING create_topic ...", flush=True)  # 兜底：即使 logging 失效也会看到
     create_topic(TOPIC_NAME)
     producer_data_in_parallel(3)
     # print(">>> DONE.", flush=True)
