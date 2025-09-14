@@ -90,7 +90,7 @@ aggregated_df = transactions_df.groupBy("merchantId") \
     ) 
 
 
-# write result back to  kafka topic AGGREGATES_TOPIC
+# write result back to kafka topic AGGREGATES_TOPIC
 aggregation_query = aggregated_df \
   .withColumn("key", col("merchantId").cast("string")) \
   .withColumn(
