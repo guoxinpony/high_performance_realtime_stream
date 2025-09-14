@@ -20,3 +20,5 @@ target
 2
 
 metadata
+
+*.log.*
