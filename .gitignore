@@ -13,4 +13,10 @@
 
 target
 
-checkpoints
+*.crc
+
+0
+1
+2
+
+metadata
